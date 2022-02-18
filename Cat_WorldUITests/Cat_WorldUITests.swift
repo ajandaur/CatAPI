@@ -6,37 +6,62 @@
 //
 
 import XCTest
+import Combine
+@testable import Cat_World
 
-class Cat_WorldUITests: XCTestCase {
 
-    override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
+class CatAPIProjectTests: XCTestCase {
 
-        // In UI tests it is usually best to stop immediately when a failure occurs.
-        continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
+    override func setUp() {
+        
     }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
+    
+    override func tearDown() {
+        subscriptions = []
     }
-
-    func testExample() throws {
-        // UI tests must launch the application that they test.
-        let app = XCUIApplication()
-        app.launch()
-
-        // Use recording to get started writing UI tests.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-    }
-
-    func testLaunchPerformance() throws {
-        if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 7.0, *) {
-            // This measures how long it takes to launch your application.
-            measure(metrics: [XCTApplicationLaunchMetric()]) {
-                XCUIApplication().launch()
+    
+    var subscriptions = Set<AnyCancellable>()
+    
+    func test_getting_breeds_success() {
+        let result = Result<[Breed], APIError>.success([Breed.example1()])
+        
+        let fetcher = BreedFetcher(service: APIMockService(result: result))
+        
+        let promise = expectation(description: "getting breeds")
+        
+        fetcher.$breeds.sink { breeds in
+            if breeds.count > 0 {
+                promise.fulfill()
             }
-        }
+        }.store(in: &subscriptions)
+        
+       
+        wait(for: [promise], timeout: 2)
     }
+    
+    
+    func test_loading_error() {
+       
+         let result = Result<[Breed], APIError>.failure(APIError.badURL)
+         let fetcher = BreedFetcher(service: APIMockService(result: result))
+         
+        let promise = expectation(description: "show error message")
+        fetcher.$breeds.sink { breeds in
+            if !breeds.isEmpty {
+                XCTFail()
+            }
+        }.store(in: &subscriptions)
+        
+        
+        fetcher.$errorMessage.sink { message in
+            if message != nil {
+                promise.fulfill()
+            }
+        }.store(in: &subscriptions)
+        
+        wait(for: [promise], timeout: 2)
+        
+    }
+
 }
+
